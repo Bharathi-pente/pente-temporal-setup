@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.5.3
+    container_name: keycloak-prod
+    restart: unless-stopped
+    
+    environment:
+      # Admin credentials - USE ENVIRONMENT VARIABLES!
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-changeme123}
+      
+      # Database - Remote PostgreSQL
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://${DB_HOST:-your-remote-db.com}:${DB_PORT:-5432}/${DB_NAME:-keycloak_prod}
+      KC_DB_USERNAME: ${DB_USERNAME}
+      KC_DB_PASSWORD: ${DB_PASSWORD}
+      
+      # Hostname configuration
+      KC_HOSTNAME: ${KC_HOSTNAME:-3.80.172.5}
+      KC_HOSTNAME_PORT: 8080
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+      
+      # Performance & Monitoring
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+      KC_LOG_LEVEL: ${KC_LOG_LEVEL:-info}
+      
+      # Cache configuration (production)
+      KC_CACHE: ispn
+      KC_CACHE_STACK: tcp
+      
+    ports:
+      - "${KC_PORT:-8080}:8080"
+      - "8443:8443"  # HTTPS port for future use
+      
+    command:
+      - start
+      - --optimized
+      - --http-enabled=true
+      - --hostname-strict=false
+      
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080;echo -e 'GET /health/ready HTTP/1.1\r\nhost: 127.0.0.1\r\nConnection: close\r\n\r\n' >&3;grep 'HTTP/1.1 200 OK' <&3"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    
+    # Optional: Add volumes for custom themes/providers
+    # volumes:
+    #   - ./themes:/opt/keycloak/themes
+    #   - ./providers:/opt/keycloak/providers
+
+networks:
+  default:
+    driver: bridge
